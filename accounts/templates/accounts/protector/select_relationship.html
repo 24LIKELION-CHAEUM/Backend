@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Relationship</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group select {
+            width: 300px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .button-container {
+            text-align: left;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h2>시니어와의 관계를 선택해주세요</h2>
+    <form method="post" action="{% url 'signup_complete' %}">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="relationship">관계</label>
+            <select id="relationship" name="relationship" required>
+                <option value="" disabled selected>관계를 선택해주세요</option>
+                <option value="자녀">자녀</option>
+                <option value="친구">친구</option>
+                <option value="배우자">배우자</option>
+                <option value="간병인">간병인</option>
+                <option value="기타">기타</option>
+            </select>
+        </div>
+        <input type="hidden" name="senior_id" value="{{ request.session.senior_id }}">
+        <div class="button-container">
+            <button type="submit">회원가입 완료</button>
+        </div>
+    </form>
+</body>
+</html>

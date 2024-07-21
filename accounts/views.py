@@ -4,6 +4,7 @@ from django.contrib.auth import login as auth_login, logout as auth_logout, auth
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
+from django.views.decorators.csrf import csrf_protect
 from .forms import UserTypeForm, CustomUserCreationForm, UserProfileForm, MealTimeForm, MedicineForm
 from .models import UserProfile, MealTime, Medicine
 import json
@@ -11,6 +12,39 @@ from datetime import datetime
 
 def home(request):
     return render(request, 'accounts/home.html')
+
+def main(request):
+    return render(request, 'accounts/main.html')
+
+def profile(request):
+    user_profile = UserProfile.objects.get(user=request.user)
+    pending_requests = user_profile.pending_protector_requests.all() if user_profile.user_type == 'senior' else None
+    seniors = user_profile.seniors if user_profile.user_type == 'protector' else None
+    return render(request, 'accounts/profile.html', {
+        'user_profile': user_profile,
+        'pending_requests': pending_requests,
+        'seniors': seniors
+    })
+
+@csrf_protect
+def accept_protector_request(request):
+    if request.method == 'POST':
+        protector_id = request.POST.get('protector_id')
+        user_profile = UserProfile.objects.get(user=request.user)
+        try:
+            protector_user = User.objects.get(id=protector_id)
+            protector_user_profile = UserProfile.objects.get(user=protector_user)
+            if 'accept' in request.POST:
+                protector_user_profile.senior_user = user_profile.user
+                protector_user_profile.save()
+                user_profile.pending_protector_requests.remove(protector_user)
+            elif 'reject' in request.POST:
+                user_profile.pending_protector_requests.remove(protector_user)
+            user_profile.save()
+            return redirect('profile')
+        except UserProfile.DoesNotExist:
+            return redirect('profile')
+    return redirect('profile')
 
 def signup_step1(request):
     if request.method == 'POST':
@@ -41,11 +75,11 @@ def signup_step3(request):
         form = UserProfileForm(request.POST)
         if form.is_valid():
             request.session['name'] = form.cleaned_data['name']
-            request.session['birth_date'] = str(form.cleaned_data['birth_date'])  # serialize date
+            request.session['birth_date'] = str(form.cleaned_data['birth_date'])
             if request.session['user_type'] == 'senior':
                 return redirect('signup_step4_senior')
-            else:
-                return redirect('signup_complete')
+            elif request.session['user_type'] == 'protector':
+                return redirect('signup_step4_protector')
     else:
         form = UserProfileForm()
     return render(request, 'accounts/signup_step3.html', {'form': form})
@@ -74,9 +108,9 @@ def meal_time(request):
         form = MealTimeForm(request.POST)
         if form.is_valid():
             meal_type = form.cleaned_data['meal_type']
-            time = form.cleaned_data['time'].strftime('%H:%M:%S')  # Convert to string
+            time = form.cleaned_data['time'].strftime('%H:%M:%S')  
             meal_times = request.session.get('meal_times', [])
-            meal_times = [mt for mt in meal_times if mt['meal_type'] != meal_type]  # 기존 항목 제거
+            meal_times = [mt for mt in meal_times if mt['meal_type'] != meal_type]  
             meal_times.append({'meal_type': meal_type, 'time': time})
             request.session['meal_times'] = meal_times
             return JsonResponse({'success': True})
@@ -111,7 +145,7 @@ def save_medicine(request):
         if form.is_valid():
             medicine_data = {
                 'name': form.cleaned_data['name'],
-                'time': form.cleaned_data['time'].strftime('%H:%M:%S'),  # Convert to string
+                'time': form.cleaned_data['time'].strftime('%H:%M:%S'), 
                 'days': form.cleaned_data['days']
             }
             medicines = request.session.get('medicines', [])
@@ -123,53 +157,116 @@ def save_medicine(request):
             return JsonResponse({'success': False, 'errors': errors})
     return JsonResponse({'success': False})
 
+def signup_step4_protector(request):
+    if 'user_type' not in request.session or request.session.get('user_type') != 'protector':
+        return redirect('signup_step1')
+
+    error = None
+    senior_user = None
+
+    if request.method == 'POST':
+        if 'search' in request.POST:
+            senior_username = request.POST.get('senior_username')
+            try:
+                senior_user = User.objects.get(username=senior_username, userprofile__user_type='senior')
+            except User.DoesNotExist:
+                error = '해당 아이디를 가진 시니어가 없습니다.'
+        elif 'select' in request.POST:
+            senior_id = request.POST.get('selected_senior_id')
+            request.session['senior_id'] = senior_id
+            return redirect('select_relationship')
+
+    return render(request, 'accounts/protector/signup_step4_protector.html', {
+        'senior_user': senior_user,
+        'error': error
+    })
+
+def select_relationship(request):
+    if 'user_type' not in request.session or request.session.get('user_type') != 'protector':
+        return redirect('signup_step1')
+
+    relationships = ['자녀', '친구', '배우자', '간병인', '기타']
+    if request.method == 'POST':
+        senior_id = request.session.get('senior_id')
+        relationship = request.POST.get('relationship')
+        request.session['relationship'] = relationship
+        request.session['senior_id'] = senior_id  
+        return redirect('signup_complete')
+
+    return render(request, 'accounts/protector/select_relationship.html', {
+        'relationships': relationships
+    })
+
 def signup_complete(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
         try:
+            user_type = request.session.get('user_type')
+
+            if user_type == 'protector':
+                senior_id = request.session.get('senior_id')
+                relationship = request.session.get('relationship')
+                data = {
+                    'username': request.session.get('username'),
+                    'password': request.session.get('password'),
+                    'name': request.session.get('name'),
+                    'birth_date': request.session.get('birth_date'),
+                    'relationship': relationship
+                }
+            else:
+                data = json.loads(request.body)
+
             with transaction.atomic():
-                # 새로운 사용자 생성
                 user = User.objects.create_user(
                     username=data['username'],
                     password=data['password']
                 )
 
-                # 사용자 프로필 생성
-                UserProfile.objects.create(
+                user_profile = UserProfile.objects.create(
                     user=user,
-                    user_type=request.session.get('user_type', 'senior'),
+                    user_type=user_type,
                     name=data['name'],
                     birth_date=data['birth_date']
                 )
 
-                # 기존 세션에서 식사 시간과 투약 정보 가져오기
-                meal_times = request.session.get('meal_times', [])
-                medicines = request.session.get('medicines', [])
+                if user_type == 'protector':
+                    senior_user = User.objects.get(id=senior_id)
+                    user_profile.pending_protector_requests.add(senior_user)
+                    user_profile.relationship = data['relationship']
+                    user_profile.save()
+                    senior_profile = UserProfile.objects.get(user=senior_user)
+                    senior_profile.pending_protector_requests.add(user)
+                    senior_profile.save()
 
-                # 새 사용자에게 식사 시간과 투약 정보를 복사
-                for meal_time in meal_times:
-                    MealTime.objects.create(
-                        user=user,
-                        meal_type=meal_time['meal_type'],
-                        time=datetime.strptime(meal_time['time'], '%H:%M:%S').time()  # Convert back to time object
-                    )
+                if user_type == 'senior':
+                    meal_times = request.session.get('meal_times', [])
+                    medicines = request.session.get('medicines', [])
 
-                for medicine in medicines:
-                    Medicine.objects.create(
-                        user=user,
-                        name=medicine['name'],
-                        time=datetime.strptime(medicine['time'], '%H:%M:%S').time(),  # Convert back to time object
-                        days=medicine['days']
-                    )
+                    for meal_time in meal_times:
+                        MealTime.objects.create(
+                            user=user,
+                            meal_type=meal_time['meal_type'],
+                            time=datetime.strptime(meal_time['time'], '%H:%M:%S').time()
+                        )
 
-            auth_login(request, user)
-            clear_signup_session(request)  # 회원가입 완료 후 세션 정보 정리
-            return JsonResponse({'success': True})
-        except IntegrityError:
-            return JsonResponse({'success': False})
-    return JsonResponse({'success': False})
+                    for medicine in medicines:
+                        Medicine.objects.create(
+                            user=user,
+                            name=medicine['name'],
+                            time=datetime.strptime(medicine['time'], '%H:%M:%S').time(),
+                            days=medicine['days']
+                        )
 
-# 회원가입 완료 후에는 세션에 저장된 정보를 정리함
+                auth_login(request, user)
+                clear_signup_session(request)
+                return redirect('home')
+        except IntegrityError as e:
+            return JsonResponse({'success': False, 'error': f'IntegrityError: {str(e)}'})
+        except User.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'User does not exist'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
 def clear_signup_session(request):
     request.session.pop('username', None)
     request.session.pop('password', None)
@@ -178,6 +275,8 @@ def clear_signup_session(request):
     request.session.pop('user_type', None)
     request.session.pop('meal_times', None)
     request.session.pop('medicines', None)
+    request.session.pop('senior_id', None)
+    request.session.pop('relationship', None)
 
 def login(request):
     if request.method == 'POST':
@@ -185,7 +284,7 @@ def login(request):
         if form.is_valid():
             user = form.get_user()
             auth_login(request, user)
-            return redirect('home')
+            return redirect('main')
     else:
         form = AuthenticationForm()
     return render(request, 'accounts/login.html', {'form': form})

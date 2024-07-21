@@ -11,9 +11,24 @@ class UserProfile(models.Model):
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES)
     name = models.CharField(max_length=100)
     birth_date = models.DateField()
-
+    senior_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='protector_userprofiles')
+    relationship = models.CharField(max_length=100, blank=True, null=True)  
+    pending_protector_requests = models.ManyToManyField(User, related_name='pending_requests', blank=True)
+    
     def __str__(self):
         return self.user.username
+
+    @property
+    def protectors(self):
+        if self.user_type == 'senior':
+            return self.user.protector_userprofiles.all()
+        return None
+
+    @property
+    def seniors(self):
+        if self.user_type == 'protector':
+            return UserProfile.objects.filter(senior_user=self.user)
+        return None
 
 class MealTime(models.Model):
     MEAL_TYPE_CHOICES = [

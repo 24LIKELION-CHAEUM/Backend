@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로필</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .pending-request, .protector-list, .senior-list {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            width: 300px;
+        }
+        .button-container {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <h2>{{ user_profile.name }}님의 프로필</h2>
+    <p>유형: {% if user_profile.user_type == 'senior' %}시니어{% else %}보호자{% endif %}</p>
+    <p>생년월일: {{ user_profile.birth_date }}</p>
+    
+    {% if user_profile.user_type == 'senior' %}
+        <h3>보호자 요청</h3>
+        {% if pending_requests %}
+            {% for protector in pending_requests %}
+                <div class="pending-request">
+                    <p>보호자 아이디: {{ protector.username }}</p>
+                    <div class="button-container">
+                        <form method="post" action="{% url 'accept_protector_request' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="protector_id" value="{{ protector.id }}">
+                            <button type="submit" name="accept">수락</button>
+                            <button type="submit" name="reject">거절</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>보호자 요청이 없습니다.</p>
+        {% endif %}
+        <h3>보호자 목록</h3>
+        {% if user_profile.protectors %}
+            {% for protector in user_profile.protectors %}
+                <div class="protector-list">
+                    <p>보호자 아이디: {{ protector.user.username }}</p>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>등록된 보호자가 없습니다.</p>
+        {% endif %}
+    {% else %}
+        <h3>연결된 시니어 목록</h3>
+        {% if seniors %}
+            {% for senior in seniors %}
+                <div class="senior-list">
+                    <p>시니어 아이디: {{ senior.user.username }}</p>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>등록된 시니어가 없습니다.</p>
+        {% endif %}
+    {% endif %}
+</body>
+</html>
