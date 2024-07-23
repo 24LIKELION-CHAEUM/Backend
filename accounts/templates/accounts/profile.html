@@ -9,29 +9,132 @@
             font-family: Arial, sans-serif;
             padding: 20px;
         }
+        .user-info {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .profile-image-large {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+        .profile-image-small {
+            max-width: 50px;  
+            height: 50px; 
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+        .user-details, .protector-details, .pending-details, .senior-details {
+            flex-grow: 1;
+        }
+        .edit-button {
+            font-size: 0.8em;
+            text-decoration: none;
+            border: 1px solid #ccc;
+            padding: 5px 10px;
+            border-radius: 3px;
+            align-self: flex-start;
+        }
+        .user-type {
+            font-size: 0.5em;
+            color: gray;
+            margin-left: 5px;
+        }
+        .birth-date {
+            font-weight: bold;
+            font-size: 0.8em;
+            color: gray;
+            display: block;
+            margin-top: 5px;
+        }
         .pending-request, .protector-list, .senior-list {
             border: 1px solid #ccc;
             padding: 10px;
             margin: 10px 0;
             border-radius: 5px;
-            width: 300px;
+            display: flex;
+            align-items: center;
         }
         .button-container {
             text-align: right;
         }
+        .protector-info, .pending-protector-info {
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        .protector-info .name, .pending-protector-info .name {
+            font-weight: bold;
+        }
+        .protector-info .birth-date, .pending-protector-info .birth-date {
+            color: gray;
+        }
     </style>
 </head>
 <body>
-    <h2>{{ user_profile.name }}님의 프로필</h2>
-    <p>유형: {% if user_profile.user_type == 'senior' %}시니어{% else %}보호자{% endif %}</p>
-    <p>생년월일: {{ user_profile.birth_date }}</p>
+    {% load static %}
+    <div class="user-info">
+        {% if user_profile.profile_image %}
+            <img src="{{ user_profile.profile_image.url }}" alt="Profile Image" class="profile-image-large">
+        {% else %}
+            <img src="{% static 'default_profile.png' %}" alt="Default Profile Image" class="profile-image-large">
+        {% endif %}
+        <div class="user-details">
+            {{ user_profile.name }}
+            <span class="user-type">
+                {% if user_profile.user_type == 'senior' %}시니어{% else %}보호자{% endif %}
+            </span>
+            <span class="birth-date">
+                {{ user_profile.birth_date|date:"Y.m.d" }}
+            </span>
+        </div>
+        <a href="{% url 'profile_change' %}" class="edit-button">수정</a>
+    </div>
     
     {% if user_profile.user_type == 'senior' %}
-        <h3>보호자 요청</h3>
+        <h3>연결된 보호자 목록</h3>
+        {% if user_profile.protectors %}
+            {% for protector in user_profile.protectors %}
+                <div class="protector-list">
+                    {% if protector.profile_image %}
+                        <img src="{{ protector.profile_image.url }}" alt="Protector Profile Image" class="profile-image-small">
+                    {% else %}
+                        <img src="{% static 'default_profile.png' %}" alt="Default Profile Image" class="profile-image-small">
+                    {% endif %}
+                    <div class="protector-details">
+                        <span class="name">{{ protector.name }}</span>
+                        <span class="birth-date">{{ protector.birth_date|date:"Y.m.d" }} | {{ protector.relationship }}</span>
+                    </div>
+                    <div class="button-container">
+                        <form method="post" action="{% url 'remove_protector' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="protector_id" value="{{ protector.user.id }}">
+                            <button type="submit">삭제</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>등록된 보호자가 없습니다.</p>
+        {% endif %}
+
+        <h3>보호자 연결 요청</h3>
         {% if pending_requests %}
             {% for protector in pending_requests %}
                 <div class="pending-request">
-                    <p>보호자 아이디: {{ protector.username }}</p>
+                    {% if protector.userprofile.profile_image %}
+                        <img src="{{ protector.userprofile.profile_image.url }}" alt="Pending Protector Profile Image" class="profile-image-small">
+                    {% else %}
+                        <img src="{% static 'default_profile.png' %}" alt="Default Profile Image" class="profile-image-small">
+                    {% endif %}
+                    <div class="pending-details">
+                        <span class="name">{{ protector.username }}</span>
+                        <span class="birth-date">{{ protector.userprofile.birth_date|date:"Y.m.d" }}</span>
+                    </div>
                     <div class="button-container">
                         <form method="post" action="{% url 'accept_protector_request' %}">
                             {% csrf_token %}
@@ -52,17 +155,6 @@
             {% endfor %}
         {% else %}
             <p>보호자 요청이 없습니다.</p>
-        {% endif %}
-
-        <h3>보호자 목록</h3>
-        {% if user_profile.protectors %}
-            {% for protector in user_profile.protectors %}
-                <div class="protector-list">
-                    <p>보호자 아이디: {{ protector.user.username }}</p>
-                </div>
-            {% endfor %}
-        {% else %}
-            <p>등록된 보호자가 없습니다.</p>
         {% endif %}
     {% else %}
         <h3>연결된 시니어 목록</h3>

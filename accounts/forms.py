@@ -48,7 +48,7 @@ class CustomUserCreationForm(forms.ModelForm):
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['name', 'birth_date']
+        fields = ['name', 'birth_date', 'profile_image']  # 프로필 사진 필드 추가
         widgets = {
             'birth_date': forms.DateInput(attrs={'type': 'date'})
         }

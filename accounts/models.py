@@ -21,6 +21,7 @@ class UserProfile(models.Model):
     birth_date = models.DateField()
     senior_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='protector_userprofiles')
     relationship = models.CharField(max_length=10, choices=RELATIONSHIP_CHOICES, blank=True, null=True)
+    profile_image = models.ImageField(upload_to='accounts/profile_images/', null=True, blank=True)  # 프로필 사진 필드 추가
     pending_protector_requests = models.ManyToManyField(User, related_name='pending_requests', blank=True)
     
     def __str__(self):

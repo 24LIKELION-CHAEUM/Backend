@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.contrib.auth import login as auth_login, logout as auth_logout, authenticate
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
@@ -26,6 +27,20 @@ def profile(request):
         'seniors': seniors
     })
 
+@login_required
+def profile_change(request):
+    user_profile = UserProfile.objects.get(user=request.user)
+
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, request.FILES, instance=user_profile)
+        if form.is_valid():
+            form.save()
+            return redirect('profile')
+    else:
+        form = UserProfileForm(instance=user_profile)
+
+    return render(request, 'accounts/profile_change.html', {'form': form, 'user_profile': user_profile})
+
 @csrf_protect
 def accept_protector_request(request):
     if request.method == 'POST':
@@ -47,6 +62,25 @@ def accept_protector_request(request):
             elif 'reject' in request.POST:
                 user_profile.pending_protector_requests.remove(protector_user)
             user_profile.save()
+            return redirect('profile')
+        except UserProfile.DoesNotExist:
+            return redirect('profile')
+    return redirect('profile')
+
+@csrf_protect
+def remove_protector(request):
+    if request.method == 'POST':
+        protector_id = request.POST.get('protector_id')
+        user_profile = UserProfile.objects.get(user=request.user)
+        try:
+            protector_user = User.objects.get(id=protector_id)
+            protector_user_profile = UserProfile.objects.get(user=protector_user)
+
+            # 시니어와 보호자의 관계를 삭제
+            protector_user_profile.senior_user = None
+            protector_user_profile.relationship = None
+            protector_user_profile.save()
+
             return redirect('profile')
         except UserProfile.DoesNotExist:
             return redirect('profile')
