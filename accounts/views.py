@@ -30,13 +30,19 @@ def profile(request):
 def accept_protector_request(request):
     if request.method == 'POST':
         protector_id = request.POST.get('protector_id')
+        relationship = request.POST.get('relationship')  # 관계명을 POST 데이터에서 가져옴
         user_profile = UserProfile.objects.get(user=request.user)
         try:
             protector_user = User.objects.get(id=protector_id)
             protector_user_profile = UserProfile.objects.get(user=protector_user)
             if 'accept' in request.POST:
                 protector_user_profile.senior_user = user_profile.user
+                protector_user_profile.relationship = relationship  # 보호자 관계명을 업데이트
                 protector_user_profile.save()
+                
+                user_profile.relationship = relationship  # 시니어 관계명도 업데이트
+                user_profile.save()
+                
                 user_profile.pending_protector_requests.remove(protector_user)
             elif 'reject' in request.POST:
                 user_profile.pending_protector_requests.remove(protector_user)
@@ -204,7 +210,7 @@ def signup_complete(request):
 
             if user_type == 'protector':
                 senior_id = request.session.get('senior_id')
-                relationship = request.session.get('relationship')
+                relationship = request.session.get('relationship')  # 세션에서 관계 정보를 가져옴
                 data = {
                     'username': request.session.get('username'),
                     'password': request.session.get('password'),
@@ -225,13 +231,13 @@ def signup_complete(request):
                     user=user,
                     user_type=user_type,
                     name=data['name'],
-                    birth_date=data['birth_date']
+                    birth_date=data['birth_date'],
+                    relationship=data.get('relationship')  # 관계 정보를 user_profile에 저장
                 )
 
                 if user_type == 'protector':
                     senior_user = User.objects.get(id=senior_id)
-                    user_profile.pending_protector_requests.add(senior_user)
-                    user_profile.relationship = data['relationship']
+                    user_profile.pending_protector_requests.add(senior_user)  # 보호자가 시니어를 요청
                     user_profile.save()
                     senior_profile = UserProfile.objects.get(user=senior_user)
                     senior_profile.pending_protector_requests.add(user)

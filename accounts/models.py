@@ -6,13 +6,21 @@ class UserProfile(models.Model):
         ('senior', 'Senior'),
         ('protector', 'Protector'),
     ]
+
+    RELATIONSHIP_CHOICES = [
+        ('자녀', '자녀'),
+        ('친구', '친구'),
+        ('배우자', '배우자'),
+        ('간병인', '간병인'),
+        ('기타', '기타'),
+    ]
     
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES)
     name = models.CharField(max_length=100)
     birth_date = models.DateField()
     senior_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='protector_userprofiles')
-    relationship = models.CharField(max_length=100, blank=True, null=True)  
+    relationship = models.CharField(max_length=10, choices=RELATIONSHIP_CHOICES, blank=True, null=True)
     pending_protector_requests = models.ManyToManyField(User, related_name='pending_requests', blank=True)
     
     def __str__(self):

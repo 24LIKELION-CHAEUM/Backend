@@ -36,6 +36,14 @@
                         <form method="post" action="{% url 'accept_protector_request' %}">
                             {% csrf_token %}
                             <input type="hidden" name="protector_id" value="{{ protector.id }}">
+                            <select name="relationship" required>
+                                <option value="" disabled selected>관계를 선택해주세요</option>
+                                <option value="자녀">자녀</option>
+                                <option value="친구">친구</option>
+                                <option value="배우자">배우자</option>
+                                <option value="간병인">간병인</option>
+                                <option value="기타">기타</option>
+                            </select>
                             <button type="submit" name="accept">수락</button>
                             <button type="submit" name="reject">거절</button>
                         </form>
@@ -45,6 +53,7 @@
         {% else %}
             <p>보호자 요청이 없습니다.</p>
         {% endif %}
+
         <h3>보호자 목록</h3>
         {% if user_profile.protectors %}
             {% for protector in user_profile.protectors %}
