@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>콕찌르기</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .search-bar {
+            margin-bottom: 20px;
+        }
+        .user-info {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            width: 80%; /* 너비를 80%로 설정 */
+            max-width: 600px; /* 최대 너비를 600px로 설정 */
+            margin: 10px 0; /* 왼쪽 정렬을 위해 자동 여백 설정 */
+        }
+        .profile-image-small {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+        .user-details {
+            flex-grow: 1;
+        }
+        .user-details p {
+            margin: 2px 0;
+        }
+        .poke-button {
+            background-color: #7d4cff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .small-text {
+            font-size: 0.8em;
+            color: gray;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('.poke-form').on('submit', function(event) {
+                event.preventDefault(); 
+                var form = $(this);
+                $.ajax({
+                    type: form.attr('method'),
+                    url: form.attr('action'),
+                    data: form.serialize(),
+                    success: function(response) {
+                        location.reload(); 
+                    },
+                    error: function(response) {
+                        alert('Error occurred. Please try again.'); 
+                    }
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+    {% load static %}
+    {% load get_item %}
+    <h2>콕찌르기</h2>
+    <form method="get" action="{% url 'poke_page' %}" class="search-bar">
+        <input type="text" name="q" placeholder="콕 찌를 사람을 검색해보세요" value="{{ query }}">
+        <button type="submit">검색</button>
+    </form>
+
+    {% if query %}
+        <h3>검색 결과</h3>
+        {% if users %}
+            {% for user in users %}
+                <div class="user-info">
+                    {% if user.userprofile.profile_image %}
+                        <img src="{{ user.userprofile.profile_image.url }}" alt="{{ user.username }}의 프로필 이미지" class="profile-image-small">
+                    {% else %}
+                        <img src="{% static 'default_profile.png' %}" alt="기본 프로필 이미지" class="profile-image-small">
+                    {% endif %}
+                    <div class="user-details">
+                        {% if last_poked_times|get_item:user.id %}
+                            <p class="small-text">{% if user_profile.user_type == 'senior' %}시니어{% else %}보호자{% endif %} | {{ last_poked_times|get_item:user.id|date:"H시 i분" }}</p>
+                        {% endif %}
+                        <p>{{ user.username }}</p>
+                        <p class="small-text">{{ user_poke_counts|get_item:user.id }}번 째 콕 찌르는 중이에요!</p>
+                    </div>
+                    <form class="poke-form" action="{% url 'poke_user' user.id %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="poke-button">나도 콕찌르기</button>
+                    </form>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>검색 결과가 없습니다.</p>
+        {% endif %}
+    {% endif %}
+</body>
+</html>
