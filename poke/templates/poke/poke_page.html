@@ -73,7 +73,7 @@
     {% load get_item %}
     <h2>콕찌르기</h2>
     <form method="get" action="{% url 'poke_page' %}" class="search-bar">
-        <input type="text" name="q" placeholder="콕 찌를 사람을 검색해보세요" value="{{ query }}">
+        <input type="text" name="q" placeholder="콕 찌를 사람을 검색해보세요" value="{{ query|default_if_none:'' }}">
         <button type="submit">검색</button>
     </form>
 
