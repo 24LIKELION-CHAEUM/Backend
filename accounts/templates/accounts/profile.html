@@ -63,14 +63,14 @@
         .button-container {
             text-align: right;
         }
-        .protector-info, .pending-protector-info {
+        .protector-info, .pending-protector-info, .senior-info {
             font-size: 0.9em;
             margin-bottom: 10px;
         }
-        .protector-info .name, .pending-protector-info .name {
+        .protector-info .name, .pending-protector-info .name, .senior-info .name {
             font-weight: bold;
         }
-        .protector-info .birth-date, .pending-protector-info .birth-date {
+        .protector-info .birth-date, .pending-protector-info .birth-date, .senior-info .birth-date {
             color: gray;
         }
     </style>
@@ -124,21 +124,21 @@
 
         <h3>보호자 연결 요청</h3>
         {% if pending_requests %}
-            {% for protector in pending_requests %}
+            {% for request in pending_requests %}
                 <div class="pending-request">
-                    {% if protector.userprofile.profile_image %}
-                        <img src="{{ protector.userprofile.profile_image.url }}" alt="Pending Protector Profile Image" class="profile-image-small">
+                    {% if request.protector.profile_image %}
+                        <img src="{{ request.protector.profile_image.url }}" alt="Pending Protector Profile Image" class="profile-image-small">
                     {% else %}
                         <img src="{% static 'default_profile.png' %}" alt="Default Profile Image" class="profile-image-small">
                     {% endif %}
                     <div class="pending-details">
-                        <span class="name">{{ protector.username }}</span>
-                        <span class="birth-date">{{ protector.userprofile.birth_date|date:"Y.m.d" }}</span>
+                        <span class="name">{{ request.protector.name }}</span>
+                        <span class="birth-date">{{ request.protector.birth_date|date:"Y.m.d" }}</span>
                     </div>
                     <div class="button-container">
                         <form method="post" action="{% url 'accept_protector_request' %}">
                             {% csrf_token %}
-                            <input type="hidden" name="protector_id" value="{{ protector.id }}">
+                            <input type="hidden" name="protector_id" value="{{ request.protector.user.id }}">
                             <select name="relationship" required>
                                 <option value="" disabled selected>관계를 선택해주세요</option>
                                 <option value="자녀">자녀</option>
@@ -158,10 +158,25 @@
         {% endif %}
     {% else %}
         <h3>연결된 시니어 목록</h3>
-        {% if seniors %}
-            {% for senior in seniors %}
+        {% if user_profile.seniors %}
+            {% for senior in user_profile.seniors %}
                 <div class="senior-list">
-                    <p>시니어 아이디: {{ senior.user.username }}</p>
+                    {% if senior.profile_image %}
+                        <img src="{{ senior.profile_image.url }}" alt="Senior Profile Image" class="profile-image-small">
+                    {% else %}
+                        <img src="{% static 'default_profile.png' %}" alt="Default Profile Image" class="profile-image-small">
+                    {% endif %}
+                    <div class="senior-details">
+                        <span class="name">{{ senior.name }}</span>
+                        <span class="birth-date">{{ senior.birth_date|date:"Y.m.d" }} | 시니어</span>
+                    </div>
+                    <div class="button-container">
+                        <form method="post" action="{% url 'remove_protector' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="senior_id" value="{{ senior.user.id }}">
+                            <button type="submit">삭제</button>
+                        </form>
+                    </div>
                 </div>
             {% endfor %}
         {% else %}

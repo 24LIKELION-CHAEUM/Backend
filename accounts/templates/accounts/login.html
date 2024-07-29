@@ -21,7 +21,7 @@
 </head>
 <body>
     <h2>로그인</h2>
-    <form method="post">
+    <form id="loginForm" method="post">
         {% csrf_token %}
         <div class="form-group">
             <label for="id_username">아이디</label>
@@ -33,5 +33,43 @@
         </div>
         <button type="submit">로그인</button>
     </form>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            var formData = new FormData(this);
+            
+            fetch('/login/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem('refresh_token', data.refresh_token);
+                    alert('Login successful');
+                    window.location.href = '/main/';  // Redirect to main.html
+                } else {
+                    alert('Login failed: ' + data.error);
+                }
+            });
+        });
+
+        function makeAuthenticatedRequest() {
+            var accessToken = localStorage.getItem('access_token');
+
+            fetch('/some-protected-endpoint/', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+            });
+        }
+    </script>
 </body>
 </html>

@@ -18,9 +18,9 @@
             border-radius: 5px;
             display: flex;
             align-items: center;
-            width: 80%; /* 너비를 80%로 설정 */
-            max-width: 600px; /* 최대 너비를 600px로 설정 */
-            margin: 10px 0; /* 왼쪽 정렬을 위해 자동 여백 설정 */
+            width: 80%;
+            max-width: 600px;
+            margin: 10px 0;
         }
         .profile-image-small {
             width: 50px;
@@ -51,17 +51,17 @@
     <script>
         $(document).ready(function() {
             $('.poke-form').on('submit', function(event) {
-                event.preventDefault(); 
+                event.preventDefault();
                 var form = $(this);
                 $.ajax({
                     type: form.attr('method'),
                     url: form.attr('action'),
                     data: form.serialize(),
                     success: function(response) {
-                        location.reload(); 
+                        location.reload();
                     },
                     error: function(response) {
-                        alert('Error occurred. Please try again.'); 
+                        alert('Error occurred. Please try again.');
                     }
                 });
             });
@@ -89,7 +89,7 @@
                     {% endif %}
                     <div class="user-details">
                         {% if last_poked_times|get_item:user.id %}
-                            <p class="small-text">{% if user_profile.user_type == 'senior' %}시니어{% else %}보호자{% endif %} | {{ last_poked_times|get_item:user.id|date:"H시 i분" }}</p>
+                            <p class="small-text">{% if user_profile.user_type == 'senior' %}보호자{% else %}시니어{% endif %} | {{ last_poked_times|get_item:user.id|date:"H시 i분" }}</p>
                         {% endif %}
                         <p>{{ user.username }}</p>
                         <p class="small-text">{{ user_poke_counts|get_item:user.id }}번 째 콕 찌르는 중이에요!</p>

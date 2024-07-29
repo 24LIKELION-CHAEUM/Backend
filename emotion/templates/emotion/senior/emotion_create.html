@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>감정 작성</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .emotion-cards {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        .emotion-card {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            width: 15%; 
+        }
+        .emotion-card.selected {
+            border-color: #7d4cff;
+            background-color: #f0e6ff;
+        }
+        .emotion-card input {
+            display: none;
+        }
+        .emotion-card label {
+            display: block;
+            cursor: pointer;
+        }
+        .emotion-card .emoji {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        .time-picker, .description-field {
+            margin-bottom: 20px;
+        }
+        .description-field textarea {
+            width: 100%;
+            height: 100px;
+            resize: none;
+            padding: 10px;
+            font-size: 1em;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+        }
+        .submit-button {
+            background-color: #7d4cff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+    </style>
+    <script>
+        function selectEmotion(card) {
+            var cards = document.getElementsByClassName('emotion-card');
+            for (var i = 0; i < cards.length; i++) {
+                cards[i].classList.remove('selected');
+            }
+            card.classList.add('selected');
+        }
+    </script>
+</head>
+<body>
+    <h2>오늘의 감정 기록하기</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="emotion-cards">
+            <div class="emotion-card" onclick="selectEmotion(this)">
+                <input type="radio" id="happy" name="emotion" value="happy">
+                <label for="happy">
+                    <div class="emoji">😊</div>
+                    행복
+                </label>
+            </div>
+            <div class="emotion-card" onclick="selectEmotion(this)">
+                <input type="radio" id="neutral" name="emotion" value="neutral">
+                <label for="neutral">
+                    <div class="emoji">😐</div>
+                    평범
+                </label>
+            </div>
+            <div class="emotion-card" onclick="selectEmotion(this)">
+                <input type="radio" id="sad" name="emotion" value="sad">
+                <label for="sad">
+                    <div class="emoji">😢</div>
+                    슬픔
+                </label>
+            </div>
+            <div class="emotion-card" onclick="selectEmotion(this)">
+                <input type="radio" id="angry" name="emotion" value="angry">
+                <label for="angry">
+                    <div class="emoji">😡</div>
+                    분노
+                </label>
+            </div>
+        </div>
+
+        <div class="time-picker">
+            <label for="time">감정을 느낀 시간</label>
+            {{ form.time }}
+        </div>
+
+        <div class="description-field">
+            <label for="description">감정을 느낀 이유</label>
+            {{ form.description }}
+        </div>
+
+        <button type="submit" class="submit-button">기록</button>
+    </form>
+</body>
+</html>

@@ -7,22 +7,11 @@ class UserProfile(models.Model):
         ('protector', 'Protector'),
     ]
 
-    RELATIONSHIP_CHOICES = [
-        ('자녀', '자녀'),
-        ('친구', '친구'),
-        ('배우자', '배우자'),
-        ('간병인', '간병인'),
-        ('기타', '기타'),
-    ]
-    
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES)
     name = models.CharField(max_length=100)
     birth_date = models.DateField()
-    senior_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='protector_userprofiles')
-    relationship = models.CharField(max_length=10, choices=RELATIONSHIP_CHOICES, blank=True, null=True)
-    profile_image = models.ImageField(upload_to='accounts/profile_images/', null=True, blank=True)  # 프로필 사진 필드 추가
-    pending_protector_requests = models.ManyToManyField(User, related_name='pending_requests', blank=True)
+    profile_image = models.ImageField(upload_to='accounts/profile_images/', null=True, blank=True)
     
     def __str__(self):
         return self.user.username
@@ -30,13 +19,13 @@ class UserProfile(models.Model):
     @property
     def protectors(self):
         if self.user_type == 'senior':
-            return self.user.protector_userprofiles.all()
+            return [rel.protector for rel in self.protector_relationships.filter(pending=False)]
         return None
 
     @property
     def seniors(self):
         if self.user_type == 'protector':
-            return UserProfile.objects.filter(senior_user=self.user)
+            return [rel.senior for rel in self.senior_relationships.filter(pending=False)]
         return None
 
 class MealTime(models.Model):
@@ -52,12 +41,29 @@ class MealTime(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.meal_type} - {self.time}"
-    
+
 class Medicine(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     time = models.TimeField()
-    days = models.CharField(max_length=50)  # 'mon,tue,wed' 형식으로 저장
+    days = models.CharField(max_length=50)  # 요일 저장 형식 ('mon,tue,wed' 등)
 
     def __str__(self):
         return f"{self.user.username} - {self.name} - {self.time} - {self.days}"
+
+class Relationship(models.Model):
+    RELATIONSHIP_CHOICES = [
+        ('자녀', '자녀'),
+        ('친구', '친구'),
+        ('배우자', '배우자'),
+        ('간병인', '간병인'),
+        ('기타', '기타'),
+    ]
+
+    senior = models.ForeignKey(UserProfile, related_name='protector_relationships', on_delete=models.CASCADE)
+    protector = models.ForeignKey(UserProfile, related_name='senior_relationships', on_delete=models.CASCADE)
+    relationship_type = models.CharField(max_length=10, choices=RELATIONSHIP_CHOICES)
+    pending = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"{self.senior.user.username} - {self.protector.user.username} - {self.relationship_type}"

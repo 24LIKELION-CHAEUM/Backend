@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import UserProfile, MealTime, Medicine
+from .models import UserProfile, MealTime, Medicine, Relationship
 
 class UserTypeForm(forms.Form):
     USER_TYPE_CHOICES = [

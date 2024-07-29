@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth import login as auth_login, logout as auth_logout, authenticate
 from django.contrib.auth.decorators import login_required
@@ -7,9 +7,10 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.views.decorators.csrf import csrf_protect
 from .forms import UserTypeForm, CustomUserCreationForm, UserProfileForm, MealTimeForm, MedicineForm
-from .models import UserProfile, MealTime, Medicine
+from .models import UserProfile, MealTime, Medicine, Relationship
 import json
 from datetime import datetime
+from rest_framework_simplejwt.tokens import RefreshToken
 
 def home(request):
     return render(request, 'accounts/home.html')
@@ -17,14 +18,17 @@ def home(request):
 def main(request):
     return render(request, 'accounts/main.html')
 
+@login_required
 def profile(request):
     user_profile = UserProfile.objects.get(user=request.user)
-    pending_requests = user_profile.pending_protector_requests.all() if user_profile.user_type == 'senior' else None
+    pending_requests = Relationship.objects.filter(senior=user_profile, pending=True) if user_profile.user_type == 'senior' else None
     seniors = user_profile.seniors if user_profile.user_type == 'protector' else None
+    protectors = user_profile.protectors if user_profile.user_type == 'senior' else None
     return render(request, 'accounts/profile.html', {
         'user_profile': user_profile,
         'pending_requests': pending_requests,
-        'seniors': seniors
+        'seniors': seniors,
+        'protectors': protectors
     })
 
 @login_required
@@ -41,29 +45,24 @@ def profile_change(request):
 
     return render(request, 'accounts/profile_change.html', {'form': form, 'user_profile': user_profile})
 
+@login_required
 @csrf_protect
 def accept_protector_request(request):
     if request.method == 'POST':
         protector_id = request.POST.get('protector_id')
-        relationship = request.POST.get('relationship')  # 관계명을 POST 데이터에서 가져옴
-        user_profile = UserProfile.objects.get(user=request.user)
+        relationship_type = request.POST.get('relationship')
+        user_profile = get_object_or_404(UserProfile, user=request.user)
         try:
-            protector_user = User.objects.get(id=protector_id)
-            protector_user_profile = UserProfile.objects.get(user=protector_user)
+            protector_profile = UserProfile.objects.get(user__id=protector_id)
+            relationship = Relationship.objects.get(senior=user_profile, protector=protector_profile, pending=True)
             if 'accept' in request.POST:
-                protector_user_profile.senior_user = user_profile.user
-                protector_user_profile.relationship = relationship  # 보호자 관계명을 업데이트
-                protector_user_profile.save()
-                
-                user_profile.relationship = relationship  # 시니어 관계명도 업데이트
-                user_profile.save()
-                
-                user_profile.pending_protector_requests.remove(protector_user)
+                relationship.relationship_type = relationship_type
+                relationship.pending = False
+                relationship.save()
             elif 'reject' in request.POST:
-                user_profile.pending_protector_requests.remove(protector_user)
-            user_profile.save()
+                relationship.delete()
             return redirect('profile')
-        except UserProfile.DoesNotExist:
+        except Relationship.DoesNotExist:
             return redirect('profile')
     return redirect('profile')
 
@@ -73,16 +72,11 @@ def remove_protector(request):
         protector_id = request.POST.get('protector_id')
         user_profile = UserProfile.objects.get(user=request.user)
         try:
-            protector_user = User.objects.get(id=protector_id)
-            protector_user_profile = UserProfile.objects.get(user=protector_user)
-
-            # 시니어와 보호자의 관계를 삭제
-            protector_user_profile.senior_user = None
-            protector_user_profile.relationship = None
-            protector_user_profile.save()
-
+            protector_profile = UserProfile.objects.get(user__id=protector_id)
+            relationship = Relationship.objects.get(senior=user_profile, protector=protector_profile)
+            relationship.delete()
             return redirect('profile')
-        except UserProfile.DoesNotExist:
+        except Relationship.DoesNotExist:
             return redirect('profile')
     return redirect('profile')
 
@@ -227,84 +221,85 @@ def select_relationship(request):
 
     relationships = ['자녀', '친구', '배우자', '간병인', '기타']
     if request.method == 'POST':
-        senior_id = request.session.get('senior_id')
         relationship = request.POST.get('relationship')
         request.session['relationship'] = relationship
-        request.session['senior_id'] = senior_id  
         return redirect('signup_complete')
 
     return render(request, 'accounts/protector/select_relationship.html', {
         'relationships': relationships
     })
 
+@csrf_protect
 def signup_complete(request):
-    if request.method == 'POST':
-        try:
-            user_type = request.session.get('user_type')
+    try:
+        user_type = request.session.get('user_type')
+
+        if user_type == 'protector':
+            senior_id = request.session.get('senior_id')
+            relationship = request.POST.get('relationship')  # 수정된 부분
+            data = {
+                'username': request.session.get('username'),
+                'password': request.session.get('password'),
+                'name': request.session.get('name'),
+                'birth_date': request.session.get('birth_date'),
+            }
+            # relationship이 None이면 오류 메시지 반환 (추가된 부분)
+            if not relationship:
+                return JsonResponse({'success': False, 'error': 'relationship not set'})
+        else:
+            data = json.loads(request.body)
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=data['username'],
+                password=data['password']
+            )
+
+            user_profile = UserProfile.objects.create(
+                user=user,
+                user_type=user_type,
+                name=data['name'],
+                birth_date=data['birth_date'],
+            )
 
             if user_type == 'protector':
-                senior_id = request.session.get('senior_id')
-                relationship = request.session.get('relationship')  # 세션에서 관계 정보를 가져옴
-                data = {
-                    'username': request.session.get('username'),
-                    'password': request.session.get('password'),
-                    'name': request.session.get('name'),
-                    'birth_date': request.session.get('birth_date'),
-                    'relationship': relationship
-                }
-            else:
-                data = json.loads(request.body)
-
-            with transaction.atomic():
-                user = User.objects.create_user(
-                    username=data['username'],
-                    password=data['password']
+                senior_user = User.objects.get(id=senior_id)
+                senior_profile = UserProfile.objects.get(user=senior_user)
+                Relationship.objects.create(
+                    senior=senior_profile,
+                    protector=user_profile,
+                    relationship_type=relationship,  # 수정된 부분
+                    pending=True
                 )
 
-                user_profile = UserProfile.objects.create(
-                    user=user,
-                    user_type=user_type,
-                    name=data['name'],
-                    birth_date=data['birth_date'],
-                    relationship=data.get('relationship')  # 관계 정보를 user_profile에 저장
-                )
+            if user_type == 'senior':
+                meal_times = request.session.get('meal_times', [])
+                medicines = request.session.get('medicines', [])
 
-                if user_type == 'protector':
-                    senior_user = User.objects.get(id=senior_id)
-                    user_profile.pending_protector_requests.add(senior_user)  # 보호자가 시니어를 요청
-                    user_profile.save()
-                    senior_profile = UserProfile.objects.get(user=senior_user)
-                    senior_profile.pending_protector_requests.add(user)
-                    senior_profile.save()
+                for meal_time in meal_times:
+                    MealTime.objects.create(
+                        user=user,
+                        meal_type=meal_time['meal_type'],
+                        time=datetime.strptime(meal_time['time'], '%H:%M:%S').time()
+                    )
 
-                if user_type == 'senior':
-                    meal_times = request.session.get('meal_times', [])
-                    medicines = request.session.get('medicines', [])
+                for medicine in medicines:
+                    Medicine.objects.create(
+                        user=user,
+                        name=medicine['name'],
+                        time=datetime.strptime(medicine['time'], '%H:%M:%S').time(),
+                        days=medicine['days']
+                    )
 
-                    for meal_time in meal_times:
-                        MealTime.objects.create(
-                            user=user,
-                            meal_type=meal_time['meal_type'],
-                            time=datetime.strptime(meal_time['time'], '%H:%M:%S').time()
-                        )
-
-                    for medicine in medicines:
-                        Medicine.objects.create(
-                            user=user,
-                            name=medicine['name'],
-                            time=datetime.strptime(medicine['time'], '%H:%M:%S').time(),
-                            days=medicine['days']
-                        )
-
-                auth_login(request, user)
-                clear_signup_session(request)
-                return redirect('home')
-        except IntegrityError as e:
-            return JsonResponse({'success': False, 'error': f'IntegrityError: {str(e)}'})
-        except User.DoesNotExist:
-            return JsonResponse({'success': False, 'error': 'User does not exist'})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
+            auth_login(request, user)
+            clear_signup_session(request)
+            return redirect('home')
+    except IntegrityError as e:
+        return JsonResponse({'success': False, 'error': f'IntegrityError: {str(e)}'})
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'User does not exist'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 def clear_signup_session(request):
@@ -324,13 +319,24 @@ def login(request):
         if form.is_valid():
             user = form.get_user()
             auth_login(request, user)
-            return redirect('main')
+            
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+
+            response = JsonResponse({'success': True, 'access_token': access_token, 'refresh_token': refresh_token})
+            return response
+        else:
+            return JsonResponse({'success': False, 'error': 'Invalid credentials'})
+
     else:
         form = AuthenticationForm()
     return render(request, 'accounts/login.html', {'form': form})
 
+@csrf_protect
 def logout(request):
     if request.method == 'POST':
         auth_logout(request)
-        return redirect('home')
+        return JsonResponse({'success': True, 'message': 'Logged out successfully'})
     return render(request, 'accounts/logout.html')

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘의 감정</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .weekdays {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 50px;
+        }
+        .weekdays div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 12%;
+        }
+        .selected-date {
+            background-color: #7d4cff;
+            color: white;
+        }
+        .emotion-entry {
+            border-radius: 10px;
+            padding: 10px;
+            margin-top: 30px;
+            display: flex;
+            align-items: center;
+        }
+        .emotion-entry .emoji {
+            font-size: 2em;
+            margin-right: 15px;
+        }
+        .emotion-entry .details {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .emotion-entry .time {
+            margin-left: 100px;
+            font-size: 0.8em;
+            color: gray;
+            margin-top: 5px;
+        }
+        .emotion-entry .description {
+            margin-top: 5px;
+            font-size: 0.7em;
+            color: gray;
+        }
+        .add-emotion {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 50%;
+            background-color: #7d4cff;
+            color: white;
+            text-decoration: none;
+            font-size: 1.5em;
+            margin-left: 10px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+        }
+        .header h3 {
+            margin: 0;
+        }
+        .header .add-emotion {
+            margin-left: 10px;
+        }
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .protector-comment-entry {
+            border-radius: 10px;
+            padding: 10px;
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            background-color: #F6F4FF; 
+        }
+        .protector-comment-entry .profile-image-small {
+            max-width: 50px;  
+            height: 50px; 
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+        .protector-comment-entry .details {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .protector-comment-entry .protector-info {
+            font-size: 0.9em;
+        }
+        .protector-comment-entry .protector-comment {
+            margin-top: 5px;
+            font-size: 0.8em;
+            color: gray;
+        }
+    </style>
+</head>
+<body>
+    {% load static %}
+    {% load date_kr %}
+    <h2>오늘의 감정</h2>
+    <div class="weekdays">
+        {% for date in dates %}
+            <div class="{% if date == selected_date %}selected-date{% endif %}">
+                <a href="?date={{ date|date:'Y-m-d' }}">
+                    <div>{{ date|date_kr }}</div>
+                    <div>{{ date|date:'j' }}</div>
+                </a>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="header">
+        <h3>{{ selected_date|date:'Y년 n월 j일' }}</h3>
+        <a href="{% url 'emotion_create' %}" class="add-emotion">+</a>
+    </div>
+
+    {% if emotions %}
+        {% for emotion in emotions %}
+            <div class="emotion-entry">
+                <span class="emoji">
+                    {% if emotion.emotion == 'happy' %}
+                        😊
+                    {% elif emotion.emotion == 'neutral' %}
+                        😐
+                    {% elif emotion.emotion == 'sad' %}
+                        😢
+                    {% elif emotion.emotion == 'angry' %}
+                        😡
+                    {% endif %}
+                </span>
+                <div class="details">
+                    <div>
+                        {{ emotion.get_emotion_display }}
+                        <span class="time">{{ emotion.time|time:"H:i" }}</span>
+                    </div>
+                    <div class="description">{{ emotion.description }}</div>
+                </div>
+            </div>
+
+            {% if emotion.protector_comment %}
+                {% for protector in emotion.user.userprofile.protectors %}
+                    <div class="protector-comment-entry">
+                        {% if protector.profile_image %}
+                            <img src="{{ protector.profile_image.url }}" alt="Protector Profile Image" class="profile-image-small">
+                        {% else %}
+                            <img src="{% static 'default_profile.png' %}" alt="Default Profile Image" class="profile-image-small">
+                        {% endif %}
+                        <div class="details">
+                            <div class="protector-info">
+                                <span class="name">{{ protector.user.username }}</span>
+                            </div>
+                            <div class="protector-comment">{{ emotion.protector_comment }}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        <p>아직 기록된 감정이 없어요</p>
+    {% endif %}
+</body>
+</html>
